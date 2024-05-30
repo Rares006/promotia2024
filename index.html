@@ -9,14 +9,18 @@
 </head>
 <body>
     <h1>12 A</h1>
-    <video id="video"></video>
+    <video id="video" autoplay muted></video>
     <canvas id="canvas" style="display:none;"></canvas>
     <div id="info"></div>
     <div id="buttonContainer">
         <button id="captureButton">Capturează</button>
-        <button id="repetatiButton" style="display:none;">Repetă poza</button>
-        <button id="sendButton" style="display:none;">Trimite poza</button>
+        <button id="recordButton">Înregistrează</button>
+        <button id="stopRecordButton" style="display:none;">Stop înregistrare</button>
+        <button id="repetatiButton" style="display:none;">Repetă</button>
+        <button id="sendButton" style="display:none;">Trimite</button>
+        <button id="switchCameraButton">Schimbă Camera</button> <!-- Noul buton -->
     </div>
+    <video id="previewVideo" controls style="display:none; margin-top: 20px;"></video>
     <img id="previewImage" style="display:none; margin-top: 20px;">
     <script src="script.js"></script>
 </body>

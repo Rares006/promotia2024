@@ -9,119 +9,186 @@ const s3 = new AWS.S3({
     params: { Bucket: 'poze12a' },
 });
 
-// Definim o variabilă pentru a urmări dacă camera este deschisă sau nu
 let cameraDeschisa = false;
+let mediaRecorder;
+let chunks = [];
+let currentStream;
+let useFrontCamera = true;
+
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const captureButton = document.getElementById('captureButton');
+const recordButton = document.getElementById('recordButton');
+const stopRecordButton = document.getElementById('stopRecordButton');
+const repetatiButton = document.getElementById('repetatiButton');
+const sendButton = document.getElementById('sendButton');
+const switchCameraButton = document.getElementById('switchCameraButton');
+const previewImage = document.getElementById('previewImage');
+const previewVideo = document.getElementById('previewVideo');
 const info = document.getElementById('info');
-info.textContent = 'Fă o poză care să rămână amintire a acestei ultime zile din viața de elev';
+
+info.textContent = 'Fă o poză sau înregistrează un video care să rămână ca amintire a acestei ultime zile din viața de elev';
 info.style.fontSize = '24px';
 info.style.marginTop = '20px';
+info.style.color = '#e4c4c7';
 info.style.fontFamily = 'Times New Roman';
 info.style.fontWeight = 'bold';
 info.style.display = 'block';
 
-document.getElementById('captureButton').addEventListener('click', function() {
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const captureButton = document.getElementById('captureButton');
-    const sendButton = document.getElementById('sendButton');
-    const previewImage = document.getElementById('previewImage');
-    const repetatiButton = document.getElementById('repetatiButton'); // Butonul pentru repetarea pozei
-
-    if (!cameraDeschisa) { // Verificăm dacă camera nu este deja deschisă
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ video: true }).then(function(stream) {
-                video.srcObject = stream;
-                video.play();
-                video.style.display = 'block';
-                video.setAttribute('playsinline', 'true'); // Previne deschiderea full screen pe iOS
-                video.setAttribute('controls', 'true'); // Previne deschiderea full screen pe unele browsere
-
-                // Setăm variabila cameraDeschisa la true pentru a indica că camera este deschisă
-                cameraDeschisa = true;
-
-                captureButton.addEventListener('click', function capturePhoto() {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-
-                    const context = canvas.getContext('2d');
-                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                    stream.getTracks().forEach(track => track.stop());
-                    video.style.display = 'none';
-                    captureButton.style.display = 'none';
-                    info.style.display = 'none';
-                    previewImage.src = canvas.toDataURL('image/png');
-                    previewImage.style.display = 'block';
-                    sendButton.style.display = 'block';
-                    repetatiButton.style.display = 'block'; // Afișăm butonul pentru repetarea pozei
-
-                }, { once: true });
-
-            }).catch(function(error) {
-                console.error('Eroare la accesarea camerei: ', error);
-            });
-        } else {
-            alert('Browser-ul tău nu suportă accesul la cameră.');
-        }
+captureButton.addEventListener('click', function() {
+    if (!cameraDeschisa) {
+        activateCamera();
     } else {
-        // Dacă camera este deja deschisă, nu facem nimic când utilizatorul apasă butonul de capturare
-        console.log('Camera este deja deschisă!');
+        takePicture();
     }
 });
 
-// Adăugăm evenimentul click pentru butonul de repetare a capturii pozei
-document.getElementById('repetatiButton').addEventListener('click', function() {
-    // Resetați variabila cameraDeschisa pentru a permite redeschiderea camerei
+recordButton.addEventListener('click', function() {
+    if (!cameraDeschisa) {
+        activateCamera();
+    } else {
+        startRecording();
+    }
+});
+
+stopRecordButton.addEventListener('click', stopRecording);
+
+repetatiButton.addEventListener('click', function() {
     cameraDeschisa = false;
-
-    // Afișăm din nou butonul de capturare
-    document.getElementById('captureButton').style.display = 'block';
-
-    // Ascundem imaginea de previzualizare și butoanele
-    document.getElementById('previewImage').style.display = 'none';
-    document.getElementById('sendButton').style.display = 'none';
-    document.getElementById('repetatiButton').style.display = 'none';
+    mediaRecorder = null;
+    chunks = [];
+    video.style.display = 'none';
+    previewImage.style.display = 'none';
+    previewVideo.style.display = 'none';
+    sendButton.style.display = 'none';
+    repetatiButton.style.display = 'none';
+    stopRecordButton.style.display = 'none';
+    captureButton.style.display = 'block';
+    recordButton.style.display = 'block';
 });
 
-document.getElementById('sendButton').addEventListener('click', function() {
-    const canvas = document.getElementById('canvas');
-    const previewImage = document.getElementById('previewImage');
-    const sendButton = document.getElementById('sendButton');
+sendButton.addEventListener('click', function() {
+    if (previewImage.style.display === 'block') {
+        const imageDataURL = canvas.toDataURL('image/png');
+        uploadImage(imageDataURL);
+    } else if (previewVideo.style.display === 'block') {
+        uploadVideo();
+    }
+});
 
-    const imageDataURL = canvas.toDataURL('image/png');
-    uploadImage(imageDataURL, function() {
-        repetatiButton.style.display = 'none';
-        sendButton.style.display = 'none';
-        previewImage.style.display = 'none';
-        info.textContent = 'Felicitări! Această poză va fi adăugată într-un album ce va fi disponibil de mâine pe acest cod QR.';
-        info.style.fontSize = '24px';
-        info.style.marginTop = '20px';
-        info.style.fontFamily = 'Times New Roman';
-        info.style.fontWeight = 'bold';
-        info.style.display = 'block';
+switchCameraButton.addEventListener('click', switchCamera);
+
+function activateCamera() {
+    const constraints = {
+        video: { facingMode: useFrontCamera ? 'user' : 'environment' },
+        audio: { echoCancellation: true }
+    };
+    navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
+        currentStream = stream;
+        video.style.transform = useFrontCamera ? 'rotateY(180deg)' : '';
+        video.srcObject = stream;
+        video.play();
+        video.style.display = 'block';
+        cameraDeschisa = true;
+        captureButton.textContent = 'Capturează';
+        recordButton.textContent = 'Înregistrează';
+        video.setAttribute('playsinline', 'true'); 
+        video.setAttribute('webkit-playsinline', 'true');
+    }).catch(function(error) {
+        console.error('Eroare la accesarea camerei: ', error);
     });
-});
+}
 
-function uploadImage(imageDataURL, callback) {
+function startRecording() {
+    chunks = [];
+    captureButton.style.display = 'none';
+    mediaRecorder = new MediaRecorder(video.srcObject);
+    mediaRecorder.ondataavailable = function(event) {
+        if (event.data.size > 0) {
+            chunks.push(event.data);
+        }
+    };
+    mediaRecorder.onstop = function() {
+        const blob = new Blob(chunks, { type: 'video/mp4' });
+        const videoURL = URL.createObjectURL(blob);
+        previewVideo.src = videoURL;
+        video.style.display = 'none';
+        recordButton.style.display = 'none';
+        stopRecordButton.style.display = 'none';
+        info.style.display = 'none';
+        previewVideo.style.display = 'block';
+        sendButton.style.display = 'block';
+        repetatiButton.style.display = 'block';
+        previewVideo.setAttribute('playsinline', 'true'); 
+        previewVideo.setAttribute('webkit-playsinline', 'true');
+    };
+    mediaRecorder.start();
+    stopRecordButton.style.display = 'block';
+    recordButton.style.display = 'none';
+
+    setTimeout(function() {
+        if (mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+        }
+    }, 15000);
+}
+
+function takePicture() {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext('2d');
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    video.style.display = 'none';
+    captureButton.style.display = 'none';
+    recordButton.style.display = 'none';
+    info.style.display = 'none';
+    previewImage.src = canvas.toDataURL('image/png');
+    previewImage.style.display = 'block';
+    sendButton.style.display = 'block';
+    repetatiButton.style.display = 'block';
+}
+
+function stopRecording() {
+    mediaRecorder.stop();
+    stopRecordButton.style.display = 'none';
+}
+
+function uploadImage(imageDataURL) {
     const blobData = dataURLtoBlob(imageDataURL);
-    console.log('Se încarcă imaginea în S3...');
+    uploadToS3(blobData, 'image/png');
+}
+
+function uploadVideo() {
+    const blobData = new Blob(chunks, { type: 'video/mp4' });
+    uploadToS3(blobData, 'video/mp4');
+}
+
+function uploadToS3(data, contentType) {
+    console.log('Se încarcă fișierul în S3...');
 
     const params = {
-        Key: `images/captured_image_${Date.now()}.png`,
-        Body: blobData,
-        ContentType: 'image/png'
+        Key: `media/captured_media_${Date.now()}.${contentType.split('/')[1]}`,
+        Body: data,
+        ContentType: contentType
     };
-
-    console.log('Parametri încărcare:', params);
 
     s3.upload(params, function(err, data) {
         if (err) {
-            console.error('Eroare la încărcarea imaginii: ', err);
+            console.error('Eroare la încărcarea fișierului: ', err);
         } else {
-            console.log('Imagine încărcată cu succes: ', data.Location);
-            if (callback) {
-                callback();
+            console.log('Fișier încărcat cu succes: ', data.Location);
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+                cameraDeschisa = false;
             }
+            repetatiButton.style.display = 'none';
+            sendButton.style.display = 'none';
+            previewImage.style.display = 'none';
+            previewVideo.style.display = 'none';
+            info.textContent = 'Felicitări! Mâine vei găsi pe acest cod QR un album cu pozele făcute azi.';
+            info.style.color = '#e4c4c7';
+            info.style.display = 'block';
         }
     });
 }
@@ -131,10 +198,16 @@ function dataURLtoBlob(dataURL) {
     const mimeString = dataURL.split(',')[0].split(':')[1].split(';')[0];
     const ab = new ArrayBuffer(byteString.length);
     const ia = new Uint8Array(ab);
-
     for (let i = 0; i < byteString.length; i++) {
         ia[i] = byteString.charCodeAt(i);
     }
-
     return new Blob([ab], { type: mimeString });
+}
+
+function switchCamera() {
+    useFrontCamera = !useFrontCamera;
+    if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+    }
+    activateCamera();
 }
