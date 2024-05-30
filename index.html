@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Capture</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.983.0.min.js"></script>
+</head>
+<body>
+    <h1>Fă o poză!</h1>
+    <video id="video"></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <div id="info"></div>
+    <div id="buttonContainer">
+        <button id="captureButton">Capturează</button>
+        <button id="repetatiButton" style="display:none;">Repetă poza</button>
+        <button id="sendButton" style="display:none;">Trimite poza</button>
+    </div>
+    <img id="previewImage" style="display:none; margin-top: 20px;">
+    <script src="script.js"></script>
+</body>
+</html>
