@@ -38,6 +38,7 @@ info.style.display = 'block';
 captureButton.addEventListener('click', function() {
     if (!cameraDeschisa) {
         activateCamera();
+        switchCameraButton.style.display = 'block'; // Afișează butonul de întoarcere a camerei
     } else {
         takePicture();
     }
@@ -46,6 +47,7 @@ captureButton.addEventListener('click', function() {
 recordButton.addEventListener('click', function() {
     if (!cameraDeschisa) {
         activateCamera();
+        switchCameraButton.style.display = 'block'; // Afișează butonul de întoarcere a camerei
     } else {
         startRecording();
     }
@@ -65,6 +67,7 @@ repetatiButton.addEventListener('click', function() {
     stopRecordButton.style.display = 'none';
     captureButton.style.display = 'block';
     recordButton.style.display = 'block';
+    switchCameraButton.style.display = 'none'; // Ascunde butonul de întoarcere a camerei
 });
 
 sendButton.addEventListener('click', function() {
@@ -74,6 +77,7 @@ sendButton.addEventListener('click', function() {
     } else if (previewVideo.style.display === 'block') {
         uploadVideo();
     }
+    switchCameraButton.style.display = 'none'; // Ascunde butonul de întoarcere a camerei
 });
 
 switchCameraButton.addEventListener('click', switchCamera);
@@ -121,6 +125,7 @@ function startRecording() {
         repetatiButton.style.display = 'block';
         previewVideo.setAttribute('playsinline', 'true'); 
         previewVideo.setAttribute('webkit-playsinline', 'true');
+        switchCameraButton.style.display = 'none'; // Ascunde butonul de întoarcere a camerei
     };
     mediaRecorder.start();
     stopRecordButton.style.display = 'block';
@@ -146,6 +151,7 @@ function takePicture() {
     previewImage.style.display = 'block';
     sendButton.style.display = 'block';
     repetatiButton.style.display = 'block';
+    switchCameraButton.style.display = 'none'; // Ascunde butonul de întoarcere a camerei
 }
 
 function stopRecording() {
@@ -177,6 +183,7 @@ function uploadToS3(data, contentType) {
             console.error('Eroare la încărcarea fișierului: ', err);
         } else {
             console.log('Fișier încărcat cu succes: ', data.Location);
+
             if (video.srcObject) {
                 video.srcObject.getTracks().forEach(track => track.stop());
                 video.srcObject = null;
